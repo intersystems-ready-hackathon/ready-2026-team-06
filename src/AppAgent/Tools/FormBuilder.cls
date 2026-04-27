@@ -165,11 +165,13 @@ ClassMethod CallEndpoint(Location As %String, RequestBody As %DynamicObject) As 
 		Set raw = raw _ req.HttpResponse.Data.Read(3200000)
 	}
 
+	Set result = ""
 	Try {
-		Quit ##class(%Library.DynamicObject).%FromJSON(raw)
+		Set result = ##class(%Library.DynamicObject).%FromJSON(raw)
 	} Catch {
-		Quit {"data": (raw)}
+		Set result = {"data": (raw)}
 	}
+	Quit result
 }
 
 }
