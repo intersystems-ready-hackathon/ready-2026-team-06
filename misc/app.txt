@@ -1,0 +1,515 @@
+WWWAITEST
+
+
+
+
+1. Agent should ask for a description of a new application in the users language include an email to receive the link for the new app 
+e.a. user answers with: Room properties to be used as room masterdata within a hotel software. Room number should be the unique field. Send application link to abc@test.com
+
+2. Agent sends the text to AI to get the language out of the text
+using AIGetLanguage  (get Language = EN)
+
+3. Agent sends text to AI to get the email out from the text
+using AIGetEmail
+
+4. Agent sends text to AI get a short name for the app
+using AIGetAnswer  (Answer = program Name)
+
+5. Agent sends the text to AI to get all possible property names plus other infos form the text
+using AIGetProperties  (Answer = csv file of properties)
+
+6. Agent sends the property list to external application to generate the class
+using AICreateClass   (Answer = Class name)
+
+7. Get the Source Code of the Class
+using GetClass  (Answer = Class as XML)
+
+8. Agent sends the class name to external application to generate the form application out of the class an get the link to the new app
+using AICreateForm  (Answer = Link to the App)
+
+9. Open link for use 
+
+-----------------------------------------------------------------
+
+
+WWWAITEST
+ 
+ WRITE !,"Explain your new program: " READ PROMPT 
+  
+ SET LANGUAGE=$$TESTLANGUAGE^WWWAITEST(PROMPT)
+ SET LANGUAGE=$$GET(LANGUAGE)
+ 
+ SET EMAIL=$$TESTEMAIL^WWWAITEST(PROMPT)
+ SET EMAIL=$$GET(EMAIL)
+ 
+ SET NAME=$$TESTNAME^WWWAITEST(PROMPT)
+ SET NAME=$$^WWWUPER($$GET(NAME))
+ 
+ SET FORMDATA=$$TESTPROPERTY^WWWAITEST(PROMPT,LANGUAGE,NAME)
+ WRITE !,FORMDATA,!
+ SET HEADER="Edit "_NAME
+ 
+ SET CLASS=$$TESTCLASS^WWWAITEST(FORMDATA,LANGUAGE,NAME,NAME,PROMPT)
+ SET CLASS=$$GET(CLASS)
+ 
+ S CLASSTEXT=$$GETCLASS^WWWAITEST(CLASS)
+ W !,CLASSTEXT
+ 
+ SET LINK=$$TESTFORM^WWWAITEST(FORMDATA,LANGUAGE,NAME,CLASS,HEADER,PROMPT,EMAIL)
+ 
+ WRITE !,"Link: ",LINK
+ 
+ QUIT
+
+TESTPROPERTY(PROMPT,LANGUAGE,NAME)   ;S FORMDATA=$$TESTPROPERTY^WWWAITEST(PROMPT)
+ 
+ 
+ SET LANGUAGE=$GET(LANGUAGE)
+ IF LANGUAGE="" SET LANGUAGE="EN"
+ 
+ SET NAME=$GET(NAME)
+ IF NAME="" SET NAME="TESTFORM"
+ 
+ SET PROMPT=$GET(PROMPT)
+ IF PROMPT="" SET PROMPT="Room properties to use as room masterdata within a hotel software. Room number should be the unique field."
+ 
+ SET RETURN=""
+ 
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ 
+ SET JSON.FormName=NAME
+ SET JSON.FormPrompt=$ZCONVERT(PROMPT,"O","UTF8")
+ SET JSON.FormType=1
+ SET JSON.FormLanguage=LANGUAGE
+
+
+
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/AIGetProperties"
+ set req.Timeout=300
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)  
+	  }
+ 
+ QUIT RETURN
+
+
+TESTCLASS(FORMDATA,LANGUAGE,NAME,HEADER,PROMPT)   ;S CLASS=$$TESTCLASS^WWWAITEST(FORMDATA)
+ 
+ 
+ SET LANGUAGE=$GET(LANGUAGE)
+ IF LANGUAGE="" SET LANGUAGE="EN"
+ 
+ 
+ SET NAME=$GET(NAME)
+ IF NAME="" SET NAME="TESTFORM"
+ 
+ SET HEADER=$GET(HEADER)
+ IF HEADER="" SET HEADER="Edit Rooms"
+ 
+ SET PROMPT=$GET(PROMPT)
+ IF PROMPT="" SET PROMPT="Room properties to use as room masterdata within a hotel software. Room number should be the unique field."
+ 
+  
+ SET NAME=$GET(NAME)
+ IF NAME="" SET NAME="TESTFORM"
+ 
+ SET RETURN=""
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ 
+ SET JSON.ClassName=NAME
+ SET JSON.ClassHeader=HEADER
+ SET JSON.ClassPrompt=$ZCONVERT(PROMPT,"O","UTF8")
+ SET JSON.ClassLanguage=LANGUAGE
+ SET JSON.ClassRenew=1  ;delete old
+ SET JSON.ClassData=$GET(FORMDATA)  ;csv file
+  
+  
+  
+ DO JSON.%Set("stream",0,"Boolean")
+ 
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/AICreateClass"
+ set req.Timeout=300
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)  
+	  }
+ 
+ 
+ ;WRITE RETURN
+ QUIT RETURN
+
+
+
+GETCLASS(CLASS)   ;S CLASS=$$GETCLASS^WWWAITEST(CLASS)
+ 
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ 
+ SET JSON.Class=CLASS
+  
+  
+ DO JSON.%Set("stream",0,"Boolean")
+ 
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/GetClass"
+ set req.Timeout=300
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ S RETURN=""
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)  
+	  }
+ 
+ 
+ ;WRITE RETURN
+ QUIT RETURN
+
+
+TESTFORM(FORMDATA,LANGUAGE,NAME,CLASS,HEADER,PROMPT,EMAIL)   ; S  LINK=$$TESTFORM^WWWAITEST(FORMDATA)
+ 
+ 
+ SET LANGUAGE=$GET(LANGUAGE)
+ IF LANGUAGE="" SET LANGUAGE="EN"
+ 
+ SET NAME=$GET(NAME)
+ IF NAME="" SET NAME="TESTFORM"
+ 
+ SET HEADER=$GET(HEADER)
+ IF HEADER="" SET HEADER="Edit Rooms"
+ 
+ 
+ SET CLASS=$GET(CLASS)
+ IF CLASS="" SET CLASS="User.TESTFORM.cls"
+ 
+ SET PROMPT=$GET(PROMPT)
+ IF PROMPT="" SET PROMPT="Room properties to use as room masterdata within a hotel software. Room number should be the unique field."
+ 
+ 
+ SET EMAIL=$GET(EMAIL)
+ 
+ 
+ 
+ SET RETURN=""
+ 
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ SET JSON.FormName=NAME
+ SET JSON.FormClass=CLASS
+ SET JSON.FormHeader=HEADER
+ SET JSON.FormPrompt=PROMPT  
+ SET JSON.FormType=1  ;1=Standard  ;3=Table  ;8=wizard
+ SET JSON.FormLanguage=LANGUAGE  ;EN=Englisch;DE=German;FR=french;ES=Spanish;PL=Polish;PT=Portuguese
+ SET JSON.FormRenew=1  ;delete old   2=delete only form
+ SET JSON.FormVersion=1  ;html
+ SET JSON.FormMenu=""  ;no menu
+ SET JSON.FormPublic=1  ;no user  ; 0=only for registered users
+ SET JSON.FormEmail=EMAIL  ;send when ready
+ SET JSON.FormData=$GET(FORMDATA)  ;csv file: Property name;Field type;Field length;Primary key yes/no;Mandatory field yes/no;Description;Sample entry xxx,xxx,xxx,...;Help text;
+  
+  
+ DO JSON.%Set("stream",0,"Boolean")
+ 
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/AICreateForm"
+ set req.Timeout=300
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)  
+	  }
+ 
+ 
+ ;WRITE RETURN
+ QUIT RETURN
+ 
+
+TESTLANGUAGE(PROMPT)   ;S LANGUAGE=$$TESTLANGUAGE^WWWAITEST(PROMPT)
+   
+   
+ 
+ SET PROMPT=$GET(PROMPT)
+ IF PROMPT="" SET PROMPT="Room properties to use as room masterdata within a hotel software. Room number should be the unique field."
+ 
+ SET RETURN="" 
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ SET JSON.Prompt=$zconvert(PROMPT,"O","UTF8")
+ 
+ DO JSON.%Set("stream",0,"Boolean")
+ 
+ 
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/AIGetLanguage"
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)
+	  }
+ 
+ ;WRITE RETURN
+ QUIT RETURN
+
+
+
+TESTNAME(PROMPT)  ; S NAME=$$TESTNAME^WWWAITEST(PROMPT)
+  
+ SET PROMPT=$GET(PROMPT)
+ IF PROMPT="" SET PROMPT="Room properties to use as room masterdata within a hotel software. Room number should be the unique field."
+  
+   
+ SET RETURN="" 
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ DO
+ 	.SET TEXT=""
+ 	.SET TEXT=TEXT_"I would like to create software for data collection. I need a short name for the program, maximum 40 characters. "
+ 	.;SET TEXT=TEXT_"The label shall serve both as a Menu item/Button to call up the program and as the Header of the entry program. "
+ 	.SET TEXT=TEXT_"Please as your answer only and exclusively a short designation. no * or ** etc. "
+ 	.SET TEXT=TEXT_"The answer from you please briefly e.g. 'Edit ...'. "
+ 	.
+ 	.SET TEXT=TEXT_"Topic of the program is: "_PROMPT_" "
+ 	.QUIT
+ 
+ 
+ SET JSON.Prompt=$zconvert(TEXT,"O","UTF8")
+ 
+ DO JSON.%Set("stream",0,"Boolean")
+ 
+ 
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/AIGetAnswer"
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)
+	  }
+ 
+ ;WRITE RETURN
+ QUIT RETURN
+
+TESTEMAIL(PROMPT)   ; S MAIL=$$TESTEMAIL^WWWAI(PROMPT)
+ 
+ 
+ SET PROMPT=$GET(PROMPT)
+ IF PROMPT="" SET PROMPT="Room properties to use as room masterdata within a hotel software. Room number should be the unique field."
+ 
+ 
+ SET RETURN=""
+ 
+ 
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ SET JSON.Prompt=$zconvert(PROMPT,"O","UTF8")
+ 
+ DO JSON.%Set("stream",0,"Boolean")
+
+ 
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/AIGetEmail"
+ set req.Timeout=300
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)  
+	  }
+	  
+ ;WRITE RETURN
+ QUIT RETURN
+ 
+
+ 
+TESTUPDATE  ;S OK=$$TESTUPDATE^WWWAI
+
+ SET RETURN=""
+ 
+ SET JSON = ##class(%Library.DynamicObject).%New()
+ 
+ Set JSON.Forms="TESTFORM;TESTFORMACTION"
+ Set JSON.Methods=""
+ Set JSON.Email="tybussek@point-erp4.de"
+	
+ DO JSON.%Set("stream",0,"Boolean")
+
+ 
+ Set req = ##class(%Net.HttpRequest).%New()
+ Set req.Server = "qwiki.agimero.com"
+ Set req.Location = "/iris/wwwrest/demo/GetUpdate"
+ set req.Timeout=300
+ Do req.SetHeader("Content-Type","application/json")
+ do req.EntityBody.Write(JSON.%ToJSON())
+ Set sc = req.Post()           
+
+
+ while req.HttpResponse.Data.AtEnd=0 {  
+	 SET RETURN=RETURN_req.HttpResponse.Data.Read(3200000)  
+	  }
+ ;WRITE RETURN
+ QUIT RETURN
+ 
+ 
+GET(JSON)
+ 
+ SET RETURN=$TRANSLATE($PIECE($GET(JSON),":",2),"([{ }])"_"""")
+ ;W !,RETURN
+ QUIT RETURN
+
+
+
+
+
+
+
+
+ 
+Describe your new program in your language and include an email to receive the link:                                                                             
+ 
+Find language:
+
+JSON={"Prompt":"Room properties to use as room masterdata within a hotel software. Room number should be the unique field."}  ; <DYNAMIC OBJECT,refs=1>
+ 
+{"Language": "EN"}
+ 
+Find an email:
+
+JSON={"Prompt":"Room properties to use as room masterdata within a hotel software. Room number should be the unique field."}  ; <DYNAMIC OBJECT,refs=1>
+ 
+{"Email": ""}
+ 
+Find a name:
+
+JSON={"Prompt":"I would like to create software for data collection. I need a short name for the program, maximum 40 characters. Please answer only and exclusively a short name. no * or comment or suggestion. Topic of the program is: Room properties to use as room masterdata within a hotel software. Room number should be the unique field. "}  ; <DYNAMIC OBJECT,refs=1>                               
+{"Answer": "RoomData"}
+ 
+Find properties:
+
+JSON={"FormName":"ROOMDATA","FormPrompt":"Room properties to use as room masterdata within a hotel software. Room number should be the unique field.","FormType":1,"FormLanguage":"EN"}  ; <DYNAMIC OBJECT,refs=1>                               
+Room Number~Text~10~yes~yes~Unique identifier for the room~101,102,103,201,202~Enter the room number. Must be unique.||Room Type~Text~50~no~yes~Type of room (e.g., Single, Double, Suite)~Single,Double,Suite,Executive Suite,Family Room~Select the room type.||Bed Type~Text~50~no~yes~Type of bed in the room~King,Queen,Twin,Double,Single~Select the bed type.||Capacity~Integer~3~no~yes~Maximum number of occupants allowed in the room~1,2,3,4,5~Enter the maximum number of guests.||Floor~Integer~3~no~yes~Floor number the room is located on~1,2,3,4,5,6,7,8,9~Enter the floor number.||Smoking Allowed~Boolean~1~no~yes~Indicates whether smoking is permitted in the room~yes,no~Select 'yes' if smoking is allowed, 'no' otherwise.||View~Text~50~no~no~Description of the view from the room~Ocean View,Mountain View,City View,Pool View,Garden View~Enter the view description.||Room Size (sqm)~Decimal~6~no~no~Size of the room in square meters~15.5,20.2,25.8,30.1,35.7~Enter the room size.||Decor Style~Text~50~no~no~Style of the room's interior design~Modern,Classic,Rustic,Minimalist,Contemporary~Enter the decor style.||Amenities~Text~255~no~no~Comma-separated list of amenities available in the room~WiFi,Air Conditioning,TV,Mini-fridge,Safe,Hair Dryer,Coffee Maker,Iron~Enter amenities, comma separated.||Accessibility~Text~50~no~no~Indicates room accessibility features~Wheelchair Accessible,Hearing Impaired,Visually Impaired~Enter accessibility features, comma separated.||Pet Allowed~Boolean~1~no~no~Indicates whether pets are allowed in the room~yes,no~Select 'yes' if pets are allowed, 'no' otherwise.||Pet Fee~Decimal~8~no~no~Fee charged for pets staying in the room~10.00,20.00,30.00,0.00~Enter the pet fee.||Extra Bed Possible~Boolean~1~no~no~Indicates if an extra bed can be added to the room~yes,no~Select 'yes' if an extra bed is possible, 'no' otherwise.||Rollaway Bed Fee~Decimal~8~no~no~Fee charged for a rollaway bed~15.00,25.00,0.00~Enter the rollaway bed fee.||Child Allowed~Boolean~1~no~no~Indicates if children are allowed in the room~yes,no~Select 'yes' if children are allowed, 'no' otherwise.||Baby Cot Possible~Boolean~1~no~no~Indicates if a baby cot can be provided~yes,no~Select 'yes' if a baby cot is possible, 'no' otherwise.||Baby Cot Fee~Decimal~8~no~no~Fee charged for a baby cot~5.00,10.00,0.00~Enter the baby cot fee.||Room Status~Text~50~no~yes~Current status of the room (e.g., Available, Occupied, Out of Order)~Available,Occupied,Out of Order,Reserved,Cleaning~Select the room status.||Rate Code~Text~20~no~no~Rate code assigned to the room~Standard,Weekend,Corporate,Conference~Enter the rate code.||Rate~Decimal~8~no~no~Room rate~100.00,120.00,150.00~Enter the room rate.||Currency~Text~3~no~no~Currency for the rate~USD,EUR,GBP,JPY~Enter the currency code.||Room Description~Text~255~no~no~A more detailed description of the room~Large double bed, balcony access, free wifi~Enter a detailed room description.||Room Location~Text~255~no~no~More detailed location information~Near the elevator, close to the pool~Enter a detailed room location information.||Room Category~Text~50~no~no~Category of the Room (e.g. Deluxe, Standard, Premium)~Deluxe,Standard,Premium,Budget,Executive~Select the category of the room.||
+ 
+ 
+Create a class:
+
+JSON={"ClassName":"ROOMDATA","ClassHeader":"ROOMDATA","ClassPrompt":"Room properties to use as room masterdata within a hotel software. Room number should be the unique field.","ClassLanguage":"EN","ClassRenew":1,"ClassData":"Room Number~Text~10~yes~yes~Unique identifier for the room~101,102,103,201,202~Enter the room number. Must be unique.||Room Type~Text~50~no~yes~Type of room (e.g., Single, Double, Suite)~Single,Double,Suite,Executive Suite,Family Room~Select the room type.||Bed Type~Text~50~no~yes~Type of bed in the room~King,Queen,Twin,Double,Single~Select the bed type.||Capacity~Integer~3~no~yes~Maximum number of occupants allowed in the room~1,2,3,4,5~Enter the maximum number of guests.||Floor~Integer~3~no~yes~Floor number the room is located on~1,2,3,4,5,6,7,8,9~Enter the floor number.||Smoking Allowed~Boolean~1~no~yes~Indicates whether smoking is permitted in the room~yes,no~Select 'yes' if smoking is allowed, 'no' otherwise.||View~Text~50~no~no~Description of the view from the room~Ocean View,Mountain View,City View,Pool View,Garden View~Enter the view description.||Room Size (sqm)~Decimal~6~no~no~Size of the room in square meters~15.5,20.2,25.8,30.1,35.7~Enter the room size.||Decor Style~Text~50~no~no~Style of the room's interior design~Modern,Classic,Rustic,Minimalist,Contemporary~Enter the decor style.||Amenities~Text~255~no~no~Comma-separated list of amenities available in the room~WiFi,Air Conditioning,TV,Mini-fridge,Safe,Hair Dryer,Coffee Maker,Iron~Enter amenities, comma separated.||Accessibility~Text~50~no~no~Indicates room accessibility features~Wheelchair Accessible,Hearing Impaired,Visually Impaired~Enter accessibility features, comma separated.||Pet Allowed~Boolean~1~no~no~Indicates whether pets are allowed in the room~yes,no~Select 'yes' if pets are allowed, 'no' otherwise.||Pet Fee~Decimal~8~no~no~Fee charged for pets staying in the room~10.00,20.00,30.00,0.00~Enter the pet fee.||Extra Bed Possible~Boolean~1~no~no~Indicates if an extra bed can be added to the room~yes,no~Select 'yes' if an extra bed is possible, 'no' otherwise.||Rollaway Bed Fee~Decimal~8~no~no~Fee charged for a rollaway bed~15.00,25.00,0.00~Enter the rollaway bed fee.||Child Allowed~Boolean~1~no~no~Indicates if children are allowed in the room~yes,no~Select 'yes' if children are allowed, 'no' otherwise.||Baby Cot Possible~Boolean~1~no~no~Indicates if a baby cot can be provided~yes,no~Select 'yes' if a baby cot is possible, 'no' otherwise.||Baby Cot Fee~Decimal~8~no~no~Fee charged for a baby cot~5.00,10.00,0.00~Enter the baby cot fee.||Room Status~Text~50~no~yes~Current status of the room (e.g., Available, Occupied, Out of Order)~Available,Occupied,Out of Order,Reserved,Cleaning~Select the room status.||Rate Code~Text~20~no~no~Rate code assigned to the room~Standard,Weekend,Corporate,Conference~Enter the rate code.||Rate~Decimal~8~no~no~Room rate~100.00,120.00,150.00~Enter the room rate.||Currency~Text~3~no~no~Currency for the rate~USD,EUR,GBP,JPY~Enter the currency code.||Room Description~Text~255~no~no~A more detailed description of the room~Large double bed, balcony access, free wifi~Enter a detailed room description.||Room Location~Text~255~no~no~More detailed location information~Near the elevator, close to the pool~Enter a detailed room location information.||Room Category~Text~50~no~no~Category of the Room (e.g. Deluxe, Standard, Premium)~Deluxe,Standard,Premium,Budget,Executive~Select the category of the room.||"}  ; <DYNAMIC OBJECT,refs=1>                  
+{"Class": "User.ROOMDATA.cls"}
+ 
+Show the class:
+
+JSON={"Class":"User.ROOMDATA.cls"}  ; <DYNAMIC OBJECT,refs=1>
+ 
+ 
+Exportieren in XML gestartet am 04/19/2026 20:28:09
+Exportiere Klasse: User.ROOMDATA
+Export erfolgreich abgeschlossen.
+<Export generator="IRIS" version="26" zv="IRIS for Windows (x86-64) 2025.1 (Buil<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA10||DE||"_{accessibility}</SqlCompu<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA9||DE||"_{amenities}</SqlComputeCod<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA21||DE||"_{currency}</SqlComputeCod<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA8||DE||"_{decorstyle}</SqlComputeCo<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA19||DE||"_{ratecode}</SqlComputeCod<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA24||DE||"_{roomcategory}</SqlComput<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA22||DE||"_{roomdescription}</SqlCom<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA23||DE||"_{roomlocation}</SqlComput<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA18||DE||"_{roomstatus}</SqlComputeC<SqlComputeCode>set {*}={Mandant}_"||ROOMDATA1||DE||"_{roomtype}</SqlComputeCode</Export>>Piece>Delimiter>">>>ession>amLocation>DE||"_{view}</SqlComputeCode>    
+
+
+Create the form and return the link:
+
+JSON={"FormName":"ROOMDATA","FormClass":"User.ROOMDATA.cls","FormHeader":"Edit ROOMDATA","FormPrompt":"Room properties to use as room masterdata within a hotel software. Room number should be the unique field.","FormType":1,"FormLanguage":"EN","FormRenew":1,"FormVersion":1,"FormMenu":"","FormPublic":1,"FormEmail":"","FormData":"Room Number~Text~10~yes~yes~Unique identifier for the room~101,102,103,201,202~Enter the room number. Must be unique.||Room Type~Text~50~no~yes~Type of room (e.g., Single, Double, Suite)~Single,Double,Suite,Executive Suite,Family Room~Select the room type.||Bed Type~Text~50~no~yes~Type of bed in the room~King,Queen,Twin,Double,Single~Select the bed type.||Capacity~Integer~3~no~yes~Maximum number of occupants allowed in the room~1,2,3,4,5~Enter the maximum number of guests.||Floor~Integer~3~no~yes~Floor number the room is located on~1,2,3,4,5,6,7,8,9~Enter the floor number.||Smoking Allowed~Boolean~1~no~yes~Indicates whether smoking is permitted in the room~yes,no~Select 'yes' if smoking is allowed, 'no' otherwise.||View~Text~50~no~no~Description of the view from the room~Ocean View,Mountain View,City View,Pool View,Garden View~Enter the view description.||Room Size (sqm)~Decimal~6~no~no~Size of the room in square meters~15.5,20.2,25.8,30.1,35.7~Enter the room size.||Decor Style~Text~50~no~no~Style of the room's interior design~Modern,Classic,Rustic,Minimalist,Contemporary~Enter the decor style.||Amenities~Text~255~no~no~Comma-separated list of amenities available in the room~WiFi,Air Conditioning,TV,Mini-fridge,Safe,Hair Dryer,Coffee Maker,Iron~Enter amenities, comma separated.||Accessibility~Text~50~no~no~Indicates room accessibility features~Wheelchair Accessible,Hearing Impaired,Visually Impaired~Enter accessibility features, comma separated.||Pet Allowed~Boolean~1~no~no~Indicates whether pets are allowed in the room~yes,no~Select 'yes' if pets are allowed, 'no' otherwise.||Pet Fee~Decimal~8~no~no~Fee charged for pets staying in the room~10.00,20.00,30.00,0.00~Enter the pet fee.||Extra Bed Possible~Boolean~1~no~no~Indicates if an extra bed can be added to the room~yes,no~Select 'yes' if an extra bed is possible, 'no' otherwise.||Rollaway Bed Fee~Decimal~8~no~no~Fee charged for a rollaway bed~15.00,25.00,0.00~Enter the rollaway bed fee.||Child Allowed~Boolean~1~no~no~Indicates if children are allowed in the room~yes,no~Select 'yes' if children are allowed, 'no' otherwise.||Baby Cot Possible~Boolean~1~no~no~Indicates if a baby cot can be provided~yes,no~Select 'yes' if a baby cot is possible, 'no' otherwise.||Baby Cot Fee~Decimal~8~no~no~Fee charged for a baby cot~5.00,10.00,0.00~Enter the baby cot fee.||Room Status~Text~50~no~yes~Current status of the room (e.g., Available, Occupied, Out of Order)~Available,Occupied,Out of Order,Reserved,Cleaning~Select the room status.||Rate Code~Text~20~no~no~Rate code assigned to the room~Standard,Weekend,Corporate,Conference~Enter the rate code.||Rate~Decimal~8~no~no~Room rate~100.00,120.00,150.00~Enter the room rate.||Currency~Text~3~no~no~Currency for the rate~USD,EUR,GBP,JPY~Enter the currency code.||Room Description~Text~255~no~no~A more detailed description of the room~Large double bed, balcony access, free wifi~Enter a detailed room description.||Room Location~Text~255~no~no~More detailed location information~Near the elevator, close to the pool~Enter a detailed room location information.||Room Category~Text~50~no~no~Category of the Room (e.g. Deluxe, Standard, Premium)~Deluxe,Standard,Premium,Budget,Executive~Select the category of the room.||"}  ; <DYNAMIC OBJECT,refs=1>
+ 
+{"url": "https://qwiki.agimero.com/csp/demo/www.cls?EP=WWWFORM&YFORM=ROOMDATAACTION&YKEY=&YNEWLANGUAGE=EN&YNOREST=1&YBED=EXTERNEN"}   
+                          
+Link: https://qwiki.agimero.com/csp/demo/www.cls?EP=WWWFORM&YFORM=ROOMDATAACTION&YKEY=&YNEWLANGUAGE=EN&YNOREST=1&YBED=EXTERNEN                                 
+
+
+
+
+
+
+
+
+
+
+
+ 
+DEMO>ZW ^TEST("AIQUEST")
+
+^TEST("AIQUEST",67679,10487369.728483,"INPUT")="In welcher Sprache ist der Text? Antworte nur mit einem Wort ohne Punkt, ohne Komma, ohne sonstige Zeichen. Der Text ist: Room properties to use as room masterdata within a hotel software. Room number should be the unique field."                                           
+
+^TEST("AIQUEST",67679,10487374.268867,"INPUT")="In folgendem Text ist ggf. eine E-Mail Adresse. Kann ich die erste erhalten? Antworte nur mit einem Wort. Der Text ist: Room properties to use as room masterdata within a hotel software. Room number should be the unique field."                                             
+^TEST("AIQUEST",67679,10487374.707498,"INPUT")="I would like to create software for data collection. I need a short name for the program, maximum 40 characters. Please answer only and exclusively a short name. no * or comment or suggestion. Topic of the program is: Room properties to use as room masterdata within a hotel software. Room number should be the unique field."                           
+
+^TEST("AIQUEST",67679,10487375.113546,"INPUT")="I like to create an Software for entering data. For that I need a .csv file with lots of properties.Answer completely in the language: English. Delimiter ist Semicolon (;). Answer only the csv file without comment or remarks.The file has to have the header: Property name;Field type;Field length;Primary key yes\/no;Mandatory field yes\/no;Description;Sample entry xxx,xxx,xxx,...;Help text;. Field content is for samples Sample entry xxx,xxx,xxx,... only and only then, if the Property is a parameter with multiple text options. No samples for yes\/no fields or number fields or simple text fields. But if it is a parameter selection, then please as much comma separated options as possible for theis field. No Semocolons within a Property name. Boolean fields please as length = 1. Mark fields as mandatory fields = yes, only if it ist realy needed a such. Ignore the sentence in the topic that contains an email address. The topic for the program is: Room properties to use as room masterdata within a hotel software. Room number should be the unique field."           
+
+^TEST("AIQUEST",67679,10487390.538362,"INPUT")="I would like to create software for data collection. I need a short name for the program, maximum 40 characters. Please as your answer only and exclusively a short designation. no * or ** etc. The answer from you please briefly e.g. Edit .... Please the answer completely in the language: English. Topic of the program is: Room properties to use as room masterdata within a hotel software. Room number should be the unique field."  
+
+^TEST("AIQUEST",67679,10487395.59576,"INPUT")="I create a dialog program and need a user manual. The program is called: Edit roomdata. In the Dialog there are the following propertiey \/ edit fields: Room Number,  Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                    
+
+^TEST("AIQUEST",67679,10487400.248025,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Room Number. The entry field length is 10. The datatype of the field is Counter Field. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                              
+
+^TEST("AIQUEST",67679,10487400.847336,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Room Type. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Single, Double, Suite, Executive Suite, Family Room. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                   
+^TEST("AIQUEST",67679,10487401.555865,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Bed Type. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: King, Queen, Twin, Double, Single. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."      
+
+^TEST("AIQUEST",67679,10487402.284917,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Capacity. The entry field length is 10. The datatype of the field is Numberfield. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."   
+
+^TEST("AIQUEST",67679,10487402.975063,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Floor. The entry field length is 10. The datatype of the field is Numberfield. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."      
+^TEST("AIQUEST",67679,10487403.535816,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Smoking Allowed. The entry field length is 1. The datatype of the field is Yes\/No Field. The user can select from these parameters: No, Yes. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                       
+
+^TEST("AIQUEST",67679,10487404.210764,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: View. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Ocean View, Mountain View, City View, Pool View, Garden View. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                               
+^TEST("AIQUEST",67679,10487404.943414,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Room Size (sqm). The entry field length is 10. The datatype of the field is Floating Field. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                         
+
+^TEST("AIQUEST",67679,10487405.643459,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Decor Style. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Modern, Classic, Rustic, Minimalist, Contemporary. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                   
+^TEST("AIQUEST",67679,10487406.366573,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Amenities. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: WiFi, Air Conditioning, TV, Mini-fridge, Safe, Hair Dryer, Coffee Maker, Iron. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                         
+^TEST("AIQUEST",67679,10487407.30518,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Accessibility. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Wheelchair Accessible, Hearing Impaired, Visually Impaired. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                         
+^TEST("AIQUEST",67679,10487408.08423,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Pet Allowed. The entry field length is 1. The datatype of the field is Yes\/No Field. The user can select from these parameters: No, Yes. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                            
+
+^TEST("AIQUEST",67679,10487408.793839,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Pet Fee. The entry field length is 10. The datatype of the field is Floating Field. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English." 
+
+^TEST("AIQUEST",67679,10487409.469993,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Extra Bed Possible. The entry field length is 1. The datatype of the field is Yes\/No Field. The user can select from these parameters: No, Yes. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                    
+
+^TEST("AIQUEST",67679,10487410.189705,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Rollaway Bed Fee. The entry field length is 10. The datatype of the field is Floating Field. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                        
+
+^TEST("AIQUEST",67679,10487410.948188,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Child Allowed. The entry field length is 1. The datatype of the field is Yes\/No Field. The user can select from these parameters: No, Yes. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                         
+
+^TEST("AIQUEST",67679,10487411.632796,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Baby Cot Possible. The entry field length is 1. The datatype of the field is Yes\/No Field. The user can select from these parameters: No, Yes. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                     
+
+^TEST("AIQUEST",67679,10487412.23899,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Baby Cot Fee. The entry field length is 10. The datatype of the field is Floating Field. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                             
+^TEST("AIQUEST",67679,10487413.004014,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Room Status. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Available, Occupied, Out of Order, Reserved, Cleaning. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                               
+^TEST("AIQUEST",67679,10487413.768465,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Rate Code. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Standard, Weekend, Corporate, Conference. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                              
+^TEST("AIQUEST",67679,10487414.552334,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Rate. The entry field length is 10. The datatype of the field is Floating Field. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."    
+^TEST("AIQUEST",67679,10487415.257,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Currency. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: USD, EUR, GBP, JPY. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                        
+^TEST("AIQUEST",67679,10487415.991866,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Room Description. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Large double bed, balcony access, free wifi. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                    
+^TEST("AIQUEST",67679,10487416.711042,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Room Location. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Near the elevator, close to the pool. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                              
+^TEST("AIQUEST",67679,10487417.416736,"INPUT")="I create a dialog program and need a field description \/ users information for one of the containig property. The field is within tie program called: Edit roomdata and the field name for the help text is called: Room Category. The entry field length is 40. The datatype of the field is Text Field. The user can select from these parameters: Deluxe, Standard, Premium, Budget, Executive. Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                                      
+^TEST("AIQUEST",67679,10487418.275435,"INPUT")="I create a dialog program and need a user manual. The program is called: Edit roomdata. The program points to the following sup-functions: + Edit roomdata.  Answer only the help text with no other comment or explanation, no question and without any * or **. Answer only in Language English."                                                              
+
+
+
+
+
+
+
